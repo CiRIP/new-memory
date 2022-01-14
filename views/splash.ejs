@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="stylesheets/normalize.css">
+    <link rel="stylesheet" href="stylesheets/style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"> 
+
+    <title>new Memory(); - a two player memory game</title>
+</head>
+<body>
+    <main class="sidebar">
+        <section class="title">
+            <h1>new <strong>Memory</strong>();</h1>
+            <h2>// a two player memory game</h2>
+        </section>
+        <section class="statistics">
+            <div class="statistic">
+                <div class="value"><%= ongoing %></div>
+                <div class="label">
+                    <%if (ongoing != 1) { %>
+                        Games
+                    <% } else { %>
+                        Game
+                    <% } %>
+                    ongoing
+                </div>
+            </div>
+            <div class="statistic">
+                <div class="value"><%= completed %></div>
+                <div class="label">
+                    <%if (completed != 1) { %>
+                        Games
+                    <% } else { %>
+                        Game
+                    <% } %>
+                    completed
+                </div>
+            </div>
+            <div class="statistic">
+                <div class="value">
+                    <%if (longest != 0) { %>
+                        <%= ~~(longest / 60) %>:<%= ((longest % 60) < 10 ? "0" : "") + (longest % 60) %>
+                    <% } else { %>
+                        --
+                    <% } %>
+                </div>
+                <div class="label">Longest match</div>
+            </div>
+        </section>
+        <section class="config">
+            <form action="/play" method="get">
+                <input class="input" type="text" name="name" id="name" placeholder="Player Name">
+                <input class="button" type="submit" value="PLAY">
+            </form>
+            <div class="show-rules-container">
+                <button id="show-rules">How do I play?</button>
+            </div>
+        </section>
+        <section id="rules">
+            <p>The aim of the game is simple: you must match pairs of identical cards. You have 5 seconds to memorize a grid of 5x5 cards, and then you both take turns selecting pairs of cards from the now face-down grid. Matching a correct pair will grant you an extra turn.</p>
+            <p><strong>Be careful though!</strong> One of the cards is an 8-ball card! Unless this card is the last one picked, the player who accidentally selects it will immediately <strong>lose</strong>. The 8-ball card will be highlighted in red up until the cards get turned around, so make sure you remember its position well.</p>
+
+            <button id="hide-rules" class="close">OKAY, I GOT IT!</button>
+        </section>
+    </main>
+    <script>
+        const showRulesButton = document.getElementById("show-rules");
+        const hideRulesButton = document.getElementById("hide-rules");
+        const rulesPopup = document.getElementById("rules");
+        
+        showRulesButton.addEventListener("click", function (e) {
+            e.preventDefault();
+            rulesPopup.className = "active";
+        });
+
+        hideRulesButton.addEventListener("click", function (e) {
+            e.preventDefault();
+            rulesPopup.className = "";
+        });
+    </script>
+</body>
+</html>

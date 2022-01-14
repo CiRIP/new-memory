@@ -81,6 +81,8 @@ function shuffle(array) {
         array[m] = array[i];
         array[i] = t;
     }
+
+    console.debug(`Placing fatal at ${array.findIndex(e => e.fatal)}`);
   
     return array;
   }

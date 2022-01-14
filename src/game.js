@@ -6,15 +6,20 @@ class Game {
     id;
     players = [];
     maxPlayers;
-    currentPlayer = 0;
+    roundLength = 10000;
+    currentPlayer;
+    timer;
 
     state = "NOT-STARTED";
     board;
+    stats;
 
-    constructor(maxPlayers) {
+    constructor(maxPlayers, roundLength, stats) {
         this.id = crypto.randomUUID();
         this.board = makeBoard();
         this.maxPlayers = maxPlayers;
+        this.roundLength = roundLength;
+        this.stats = stats;
     }
 
     full() {
@@ -22,15 +27,24 @@ class Game {
     }
 
     start() {
+        this.state = "STARTED";
+
         const startMessage = messages.O_GAME_START;
         startMessage.data = {
             board: this.board,
             players: this.players.map(e => ({ id: e.id, name: e.name })),
         };
 
+        const sStartMessage = JSON.stringify(startMessage);
+
         for (const player of this.players) {
-            player.send(JSON.stringify(startMessage));
+            player.send(sStartMessage);
         }
+
+        this.stats.started++;
+        this.stats.ongoing++;
+
+        this.setTurn(0);
     }
 
     addPlayer(ws, name) {
@@ -48,11 +62,20 @@ class Game {
         ws.send(JSON.stringify(idMessage));
 
 
-        setTimeout(() => this.start(), 3000);
+        // setTimeout(() => this.start(), 3000);
     }
 
     select(player, index) {
         if (!this.board[index]) return;
+        if (player !== this.players[this.currentPlayer]) return;
+
+        if (this.board[index].fatal) {
+            this.lose(player);
+
+            console.debug(`${player.name}@${player.id}: selected fatal at index ${index}`);
+
+            return;
+        }
         
         const selectMessage = messages.O_SELECT_PIECE;
         selectMessage.data = {
@@ -60,10 +83,12 @@ class Game {
             piece: index,
         }
 
+        const sSelectMessage = JSON.stringify(selectMessage);
+
         for (const other of this.players) {
             if (other == player) continue;
 
-            other.send(JSON.stringify(selectMessage));
+            other.send(sSelectMessage);
         }
 
         if (!player.selection) {
@@ -87,17 +112,26 @@ class Game {
                 selection: [index, prevIndex],
             }
 
+            const sCorrectMessage = JSON.stringify(correctMessage);
+
             for (const other of this.players) {
-                other.send(JSON.stringify(correctMessage));
+                other.send(sCorrectMessage);
             }
 
-            this.setTurn(this.currentPlayer);
+            if (this.finished()) {
+                this.gameOver();
 
-            return;
+                return;
+            } else {
+                this.setTurn(this.currentPlayer);
+
+                return;
+            }
+        
         } else {
             player.selection = null;
 
-            this.setTurn((this.currentPlayer + 1) % this.players.length);
+            this.nextPlayer();
         }
     }
 
@@ -107,8 +141,104 @@ class Game {
         const turnMessage = messages.O_PLAYER_TURN;
         turnMessage.data = {
             player: this.players[playerIndex].id,
-            time: 10000,
+            time: this.roundLength,
         };
+
+        const sTurnMessage = JSON.stringify(turnMessage);
+
+        for (const player of this.players) {
+            player.send(sTurnMessage);
+        }
+
+        clearTimeout(this.timer);
+        this.timer = setTimeout(() => this.nextPlayer(), this.roundLength);
+    }
+
+    nextPlayer() {
+        this.setTurn((this.currentPlayer + 1) % this.players.length);
+    }
+
+    abort() {
+        if (this.status == "ABORTED") return;
+
+        this.status = "ABORTED";
+
+        clearTimeout(this.timer);
+        this.timer = null;
+
+        this.stats.ongoing--;
+
+        for (let i in this.players) {
+            try {
+                this.players[i].close(1000, messages.S_GAME_ABORTED);
+                delete this.players[i];
+            } catch (e) {}
+        }
+    }
+
+    lose(player) {
+        this.players = this.players.filter(i => i !== player);
+
+        const gameOverMessage = messages.O_GAME_OVER;
+        gameOverMessage.data = {
+            status: "FATAL",
+            winner: null,
+        };
+
+        const sGameOverMessage = JSON.stringify(gameOverMessage);
+
+        try {
+            player.close(1000, sGameOverMessage);
+        } catch (e) {}
+
+        if (this.players.length <= 1) {
+            this.gameOver();
+        }
+    }
+
+    gameOver() {
+        const winner = this.players.reduce((p, v) => p.score > v.score ? p : v);
+
+        const winners = this.players.filter(e => e.score === winner.score);
+        const losers = this.players.filter(e => e.score !== winner.score);
+
+
+        const winnerMessage = messages.O_GAME_OVER;
+        winnerMessage.data = {
+            status: "WON",
+            winner: winners.map(e => e.id),
+        };
+
+        const sWinnerMessage = JSON.stringify(winnerMessage);
+
+
+        const loserMessage = messages.O_GAME_OVER;
+        loserMessage.data = {
+            status: "LOST",
+            winner: winners.map(e => e.id),
+        };
+
+        const sLoserMessage = JSON.stringify(loserMessage);
+
+
+        for (const winner of winners) {
+            try {
+                winner.close(1000, sWinnerMessage);
+            } catch (e) {}
+        }
+
+        for (const loser of losers) {
+            try {
+                loser.close(1000, sLoserMessage);
+            } catch (e) {}
+        }
+
+
+        this.abort();
+    }
+
+    finished() {
+        return this.board.some(e => e && !e.fatal);
     }
 
 
@@ -120,6 +250,16 @@ class Game {
                 this.select(player, m.data.piece);
                 break;
         }
+    }
+
+    handleClose(player, code, reason) {
+        if (code == 1000) return;
+        if (code != 1001) console.error(`Unexpected close (${code}) from ${player.name}@${player.id}`);
+
+        if (this.players.length >= 2)
+            this.lose(player);
+        else
+            this.abort();
     }
 }
 

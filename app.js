@@ -10,6 +10,7 @@ const { URL } = require('url');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 const Game = require('./src/game');
+const StatTracker = require('./src/stat_tracker');
 
 var app = express();
 
@@ -47,19 +48,28 @@ module.exports = app;
 const server = http.createServer(app);
 const wss = new ws.Server({ server });
 
-let newGame = new Game(2);
+const stats = new StatTracker();
+let newGame = new Game(2, 10000, stats);
+
+// stats setup
+app.set('stats', stats);
 
 wss.on('connection', (ws, req) => {
+    if (newGame.state != "NOT-STARTED") {
+        newGame = new Game(2, 10000, stats);
+    }
+    
     const url = new URL(req.url, 'ws://localhost:8080/');
 
     newGame.addPlayer(ws, url.searchParams.get('name'));
 
     if (newGame.full()) {
-        newGame = new Game(2);
+        newGame.start();
+        newGame = new Game(2, 10000, stats);
     }
 
     ws.on('message', m => ws.game.handleMessage(ws, m));
-    ws.on('close', code => console.log("bafta coaie"));
+    ws.on('close', code => ws.game.handleClose(ws, code));
 })
 
 server.listen(process.argv[2]);
