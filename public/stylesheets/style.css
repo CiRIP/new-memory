@@ -13,6 +13,34 @@ body {
   flex-direction: row;
 }
 
+.alert {
+  background: red;
+  position: fixed;
+
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 32px;
+
+  padding: 0 8px;
+
+  font-size: small;
+  text-align: center;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  visibility: hidden;
+}
+
+@media (max-width: 768px) {
+  .alert {
+    visibility: visible;
+  }
+}
+
 .sidebar {
   background-color: black;
   color: white;

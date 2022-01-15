@@ -23,6 +23,8 @@
 
     padding: 16px;
     margin-bottom: 16px;
+
+    transition: box-shadow 150ms ease-out, transform 150ms ease-out;
 }
 
 .player-current .player-header {
@@ -74,6 +76,38 @@
 }
 
 
+.chat {
+    padding: 32px 16px;
+
+    flex: 0 1;
+
+    width: 100%;
+    max-width: 480px;
+}
+
+.chat-box {
+    border: 1px white solid;
+    border-bottom: none;
+
+    height: 192px;
+
+    position: relative;
+
+    overflow-y: scroll;
+    scroll-behavior: smooth;
+}
+
+#chat-messages {
+    list-style: none;
+
+    padding: 0 16px;
+}
+
+.chat-sender {
+    font-weight: bold;
+}
+
+
 
 .game-container {
     padding: 32px;
@@ -109,4 +143,35 @@
 .game-card:hover {
     transform: translate(-2px, -2px);
     box-shadow: 8px 8px 0 #1181A7;
+}
+
+.popover {
+    position: fixed;
+
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+
+    background-color: #000D;
+    color: white;
+
+    text-align: center;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+}
+
+.popover h1 {
+    font-size: 8em;
+}
+
+.popover h2 {
+    font-size: 4em;
+}
+
+#game-over {
+    visibility: hidden;
 }

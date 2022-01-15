@@ -55,13 +55,15 @@ let newGame = new Game(2, 10000, stats);
 app.set('stats', stats);
 
 wss.on('connection', (ws, req) => {
-    if (newGame.state != "NOT-STARTED") {
+    if (newGame.started || newGame.aborted) {
         newGame = new Game(2, 10000, stats);
     }
     
     const url = new URL(req.url, 'ws://localhost:8080/');
 
-    newGame.addPlayer(ws, url.searchParams.get('name'));
+    //console.debug(ws);
+
+    newGame.addPlayer(ws, url.searchParams.get('name') || 'Player');
 
     if (newGame.full()) {
         newGame.start();

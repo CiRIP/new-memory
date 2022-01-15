@@ -7,10 +7,14 @@ class Game {
     players = [];
     maxPlayers;
     roundLength = 10000;
-    currentPlayer;
+    currentPlayer = null;
     timer;
 
+    startTime;
+
     state = "NOT-STARTED";
+    started = false;
+    aborted = false;
     board;
     stats;
 
@@ -27,7 +31,11 @@ class Game {
     }
 
     start() {
-        this.state = "STARTED";
+        if (this.started) return;
+        if (this.aborted) return;
+        if (this.players.length < 2) return;
+        
+        this.started = true;
 
         const startMessage = messages.O_GAME_START;
         startMessage.data = {
@@ -38,13 +46,20 @@ class Game {
         const sStartMessage = JSON.stringify(startMessage);
 
         for (const player of this.players) {
-            player.send(sStartMessage);
+            try {
+                player.send(sStartMessage);
+            } catch (e) {}
         }
 
         this.stats.started++;
         this.stats.ongoing++;
 
-        this.setTurn(0);
+        this.startTime = Date.now();
+
+        if (this.timer === -1) return;
+        this.timer = setTimeout(() => {
+            this.setTurn(0);
+        }, 10000);
     }
 
     addPlayer(ws, name) {
@@ -57,7 +72,10 @@ class Game {
         this.players.push(ws);
 
         const idMessage = messages.O_CLIENT_ID;
-        idMessage.data = ws.id;
+        idMessage.data = {
+            id: ws.id,
+            name: ws.name,
+        }
 
         ws.send(JSON.stringify(idMessage));
 
@@ -66,8 +84,9 @@ class Game {
     }
 
     select(player, index) {
+        if (this.currentPlayer === null) return;
         if (!this.board[index]) return;
-        if (player !== this.players[this.currentPlayer]) return;
+        if (player.id !== this.players[this.currentPlayer].id) return;
 
         if (this.board[index].fatal) {
             this.lose(player);
@@ -86,21 +105,19 @@ class Game {
         const sSelectMessage = JSON.stringify(selectMessage);
 
         for (const other of this.players) {
-            if (other == player) continue;
-
             other.send(sSelectMessage);
         }
 
         if (!player.selection) {
-            player.selection = this.board[index];
+            player.selection = index;
 
             return;
         }
 
-        if (player.selection.id == this.board[index].id) {
-            player.scored.push(this.board[index]);
+        const prevIndex = player.selection;
 
-            const prevIndex = this.board.indexOf(player.selection);
+        if (this.board[prevIndex].id === this.board[index].id) {
+            player.scored.push(this.board[index]);
 
             player.selection = null;
             this.board[index] = null;
@@ -150,6 +167,7 @@ class Game {
             player.send(sTurnMessage);
         }
 
+        if (this.timer === -1) return;
         clearTimeout(this.timer);
         this.timer = setTimeout(() => this.nextPlayer(), this.roundLength);
     }
@@ -158,17 +176,35 @@ class Game {
         this.setTurn((this.currentPlayer + 1) % this.players.length);
     }
 
-    abort() {
-        if (this.status == "ABORTED") return;
+    chat(player, message) {
+        if (!player) return;
+        if (!message) return;
 
-        this.status = "ABORTED";
+        const chatMessage = messages.O_CHAT_MESSAGE;
+        chatMessage.data = {
+            player: player.id,
+            message: message,
+        }
+
+        const sChatMessage = JSON.stringify(chatMessage);
+
+        for (const player of this.players) {
+            player.send(sChatMessage);
+        }
+    }
+
+    abort() {
+        if (!this.started) return;
+        if (this.aborted) return;
+
+        this.aborted = true;
 
         clearTimeout(this.timer);
-        this.timer = null;
+        this.timer = -1;
 
         this.stats.ongoing--;
 
-        for (let i in this.players) {
+        for (const i in this.players) {
             try {
                 this.players[i].close(1000, messages.S_GAME_ABORTED);
                 delete this.players[i];
@@ -197,10 +233,10 @@ class Game {
     }
 
     gameOver() {
-        const winner = this.players.reduce((p, v) => p.score > v.score ? p : v);
+        const highScore = this.players.reduce((p, v) => p.scored.length > v.scored.length ? p : v);
 
-        const winners = this.players.filter(e => e.score === winner.score);
-        const losers = this.players.filter(e => e.score !== winner.score);
+        const winners = this.players.filter(e => e.scored.length === highScore.scored.length);
+        const losers = this.players.filter(e => e.scored.length !== highScore.scored.length);
 
 
         const winnerMessage = messages.O_GAME_OVER;
@@ -221,16 +257,26 @@ class Game {
         const sLoserMessage = JSON.stringify(loserMessage);
 
 
+        this.stats.completed++;
+
+        const roundTime = ~~((Date.now() - this.startTime) / 1000);
+        this.stats.longest = this.stats.longest < roundTime ? roundTime : this.stats.longest;
+
+
         for (const winner of winners) {
             try {
                 winner.close(1000, sWinnerMessage);
-            } catch (e) {}
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         for (const loser of losers) {
             try {
                 loser.close(1000, sLoserMessage);
-            } catch (e) {}
+            } catch (e) {
+                console.error(e);
+            }
         }
 
 
@@ -238,7 +284,7 @@ class Game {
     }
 
     finished() {
-        return this.board.some(e => e && !e.fatal);
+        return !this.board.some(e => e && !e.fatal);
     }
 
 
@@ -249,14 +295,20 @@ class Game {
             case messages.T_SELECT_PIECE:
                 this.select(player, m.data.piece);
                 break;
+            case messages.T_CHAT_MESSAGE:
+                this.chat(player, m.data.message);
+                break;
+            default:
+                break;
         }
     }
 
     handleClose(player, code, reason) {
+        console.error(`Unexpected close (${code}) from ${player.name}@${player.id}`);
         if (code == 1000) return;
-        if (code != 1001) console.error(`Unexpected close (${code}) from ${player.name}@${player.id}`);
+        // if (code != 1001) 
 
-        if (this.players.length >= 2)
+        if (this.players.length > 2)
             this.lose(player);
         else
             this.abort();

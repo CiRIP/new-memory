@@ -47,6 +47,13 @@
 		type: exports.T_CORRECT_SELECTION,
 		data: null,
 	};
+
+	// C(1) -> S -> C(*): Receive a chat message from a client and broadcast it to the other players
+	exports.T_CHAT_MESSAGE = "CHAT-MESSAGE";
+	exports.O_CHAT_MESSAGE = {
+		type: exports.T_CHAT_MESSAGE,
+		data: null,
+	};
   })(typeof exports === "undefined" ? (this.Messages = {}) : exports);
   //if exports is undefined, we are on the client; else the server
   
