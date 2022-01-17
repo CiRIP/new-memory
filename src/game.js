@@ -15,6 +15,7 @@ class Game {
     state = "NOT-STARTED";
     started = false;
     aborted = false;
+    paused = true;
     board;
     stats;
 
@@ -31,8 +32,12 @@ class Game {
     }
 
     start() {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+        
         if (this.started) return;
-        if (this.aborted) return;
         if (this.players.length < 2) return;
         
         this.started = true;
@@ -58,11 +63,17 @@ class Game {
 
         if (this.timer === -1) return;
         this.timer = setTimeout(() => {
+            this.paused = false;
             this.setTurn(0);
         }, 10000);
     }
 
     addPlayer(ws, name) {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+
         ws.name = name;
         ws.id = crypto.randomUUID();
         ws.selection = null;
@@ -84,6 +95,12 @@ class Game {
     }
 
     select(player, index) {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+
+        if (this.paused) return;
         if (this.currentPlayer === null) return;
         if (!this.board[index]) return;
         if (player.id !== this.players[this.currentPlayer].id) return;
@@ -148,11 +165,21 @@ class Game {
         } else {
             player.selection = null;
 
-            this.nextPlayer();
+            this.paused = true;
+            clearTimeout(this.timer);
+            this.timer = setTimeout(() => {
+                this.paused = false;
+                this.nextPlayer();
+            }, 1000);
         }
     }
 
     setTurn(playerIndex) {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+        
         this.currentPlayer = playerIndex;
 
         const turnMessage = messages.O_PLAYER_TURN;
@@ -177,6 +204,11 @@ class Game {
     }
 
     chat(player, message) {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+        
         if (!player) return;
         if (!message) return;
 
@@ -194,15 +226,12 @@ class Game {
     }
 
     abort() {
-        if (!this.started) return;
-        if (this.aborted) return;
-
         this.aborted = true;
 
         clearTimeout(this.timer);
         this.timer = -1;
 
-        this.stats.ongoing--;
+        if (this.started) this.stats.ongoing--;
 
         for (const i in this.players) {
             try {
@@ -289,6 +318,11 @@ class Game {
 
 
     handleMessage(player, message) {
+        if (this.aborted) {
+            this.abort();
+            return;
+        }
+        
         const m = JSON.parse(message.toString());
 
         switch (m.type) {

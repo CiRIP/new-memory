@@ -20,9 +20,8 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 32px;
 
-  padding: 0 8px;
+  padding: 8px;
 
   font-size: small;
   text-align: center;
@@ -45,7 +44,6 @@ body {
   background-color: black;
   color: white;
 
-  height: 100%;
   max-width: 640px;
 
   flex: 1 0;
@@ -59,10 +57,20 @@ body {
 
   position: relative;
 
-  overflow: hidden;
+  overflow: auto;
 
   /* padding-right: 64px;
   clip-path: polygon(0 0, 80% 0%, 100% 100%, 0% 100%); */
+}
+
+@media (max-width: 768px) {
+  body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    max-width: none;
+  }
 }
 
 .title, .statistics, .config {
@@ -106,7 +114,7 @@ body {
 #rules {
   visibility: hidden;
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(0);
 
   position: absolute;
   bottom: 0;
@@ -123,7 +131,7 @@ body {
   visibility: visible;
   opacity: 1;
 
-  transform: translateY(0);
+  transform: translateY(-16px);
 }
 
 #rules .close {
@@ -239,8 +247,8 @@ input {
 }
 
 .statistics {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
 
   text-align: center;
 }

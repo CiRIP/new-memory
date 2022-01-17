@@ -203,6 +203,13 @@ Game.prototype.take = function (id, selection) {
 
     player.score++;
     this.updateScore(player);
+
+    const prizeCard = document.createElement("div");
+    prizeCard.classList.add("player-card");
+    prizeCard.style.backgroundImage = `url(${card1.image})`;
+    prizeCard.style.backgroundSize = "cover";
+
+    player.element.querySelector(".player-cards").append(prizeCard);
 }
 
 Game.prototype.buildPlayer = function (name) {
